@@ -1,0 +1,41 @@
+#version: '3'
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+  collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: collector
+    command: ['--config=/etc/otel-collector-config.yaml']
+    volumes:
+      - /Users/jaehong.kim/nginx-otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+  nginxotel:
+    image: nginxplus
+    container_name: nginxotel
+    network_mode: "host"
+    volumes:
+      #- ./opentelemetry_nodule.conf:/etc/nginx/conf.d/opentelemetry_module.conf
+      - /Users/jaehong.kim/nginx-otel/default.conf:/etc/nginx/conf.d/default.conf
+  backend:
+    build: ./backend
+    image: backend-with-otel
+    container_name: backend
+    environment:
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318/
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=backend
+
+  frontend:
+    build: ./frontend
+    image: frontend-with-otel
+    container_name: frontend
+    ports:
+      - '8000:8000'
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318/
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_SERVICE_NAME=frontend
